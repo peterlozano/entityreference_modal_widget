@@ -64,15 +64,33 @@ function entityreference_modal_widget_field_widget_settings_form($field, $instan
   $settings = $widget['settings'];
 
   if ($widget['type'] == 'entityreference_modal_widget') {
-    $plugins = array(
-      'view' => t('View'),
-    );
+    ctools_include('plugins');
+    $plugins = ctools_get_plugins('entityreference_modal_widget', 'ermw_modal');
+    $plugin_options = array();
+    foreach ($plugins as $id => $plugin) {
+      $plugin_options[$id] = $plugin['label'];
+    }
+
+    if (empty($plugin_options)) {
+      $element['message'] = array(
+        '#markup' => t('Sorry no operation plugins available in the system.'),
+      );
+      return $element;
+    }
+
     $element['plugin'] = array(
       '#type' => 'select',
       '#title' => t('Plugin'),
-      '#options' => $plugins,
+      '#options' => $plugin_options,
       '#default_value' => isset($settings['plugin']) ? $settings['plugin'] : '',
     );
+
+    // Get the options form for the selected plugin.
+    if (isset($settings['plugin'])
+      && ($plugin = entityreference_modal_widget_plugin_instance($settings['plugin']))) {
+      $element += $plugin->options_form($settings);
+    }
+
     $element['close_modal'] = array(
       '#type' => 'checkbox',
       '#title' => t('Close modal window after submitting the items'),
@@ -206,33 +224,39 @@ function entityreference_modal_widget_modal($mode, $settings_selector, $field_na
   ctools_include('modal');
   ctools_include('ajax');
 
-  $field = field_info_field($field_name);
   $instance = field_info_instance($entity_type, $field_name, $bundle);
 
-  $html = "HELLO WORLD!!";
+  $plugin_name = $instance['widget']['settings']['plugin'];
+  if (!empty($plugin_name)) {
+    // Get a instance of the selected plugin.
+    $plugin = entityreference_modal_widget_plugin_instance($plugin_name);
 
-  $submit = array(
-    '#type' => 'container',
-    '#attributes' => array(
-      'id' => 'entityreference-modal-widget-modal-submit',
-    ),
-    'button_add' => array(
-      '#type' => 'button',
-      '#value' => t('Submit'),
-      '#attributes' => array(
-        'class' => array('button'),
-      ),
-    ),
-    'settings_selector' => array(
-      '#type' => 'hidden',
-      '#value' => $settings_selector,
-      '#attributes' => array(
-        'id' => 'entityreference-modal-widget-settings-selector',
-      ),
-    ),
-  );
+    // Call the render method, pass the settings.
+    $html = $plugin->render($instance['widget']['settings']);
 
-  $html .= drupal_render($submit);
+    $submit = array(
+      '#type' => 'container',
+      '#attributes' => array(
+        'id' => 'entityreference-modal-widget-modal-submit',
+      ),
+      'button_add' => array(
+        '#type' => 'button',
+        '#value' => t('Submit'),
+        '#attributes' => array(
+          'class' => array('button'),
+        ),
+      ),
+      'settings_selector' => array(
+        '#type' => 'hidden',
+        '#value' => $settings_selector,
+        '#attributes' => array(
+          'id' => 'entityreference-modal-widget-settings-selector',
+        ),
+      ),
+    );
+
+    $html .= drupal_render($submit);
+  }
 
   return ctools_modal_render(t('Select entities'), $html);
 }
@@ -422,4 +446,53 @@ function theme_entityreference_modal_widget_rows($variables) {
   }
 
   return implode("\n", $output);
+}
+
+/**
+ * Implements hook_ctools_plugin_type().
+ */
+function entityreference_modal_widget_ctools_plugin_type() {
+  $return = array();
+
+  $return['ermw_modal'] = array(
+    'use hooks' => TRUE,
+  );
+
+  return $return;
+}
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function entityreference_modal_widget_ctools_plugin_directory($owner, $plugin_type) {
+  switch ($plugin_type) {
+    case 'ermw_modal':
+      return "plugins/ermw_modal";
+  }
+
+  return NULL;
+}
+
+/**
+ * Returns a modal plugin instance.
+ *
+ * @param $id
+ * @return entityreference_modal_widget
+ */
+function entityreference_modal_widget_plugin_instance($id) {
+  $instances = &drupal_static(__FUNCTION__);
+
+  if (!isset($instances[$id])) {
+    ctools_include('plugins');
+    $plugin = ctools_get_plugins('entityreference_modal_widget', 'ermw_modal', $id);
+    $class = ctools_plugin_get_class($plugin, 'handler');
+    $instances[$id] = new $class();
+
+    // Check that plugin class has inherited proper parent class.
+    if (!is_subclass_of($instances[$id], 'entityreference_modal_widget')) {
+      $instances[$id] = NULL;
+    }
+  }
+
+  return $instances[$id];
 }
