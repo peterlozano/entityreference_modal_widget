@@ -61,4 +61,14 @@ class entityreference_modal_widget_view extends entityreference_modal_widget {
 
     return $form;
   }
+
+  public function get_entity_ids($post) {
+    $entity_ids = array();
+    foreach ($post_entity_ids as $entity_id) {
+      $entity_ids[] = $entity_id;
+    }
+    $entity_ids = array_unique($entity_ids);
+
+    return $entity_ids;
+  }
 }

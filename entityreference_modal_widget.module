@@ -134,6 +134,9 @@ function entityreference_modal_widget_field_widget_form(&$form, &$form_state, $f
     'field_label' => $instance['label'],
     'close_modal' => $instance['widget']['settings']['close_modal'],
     'plugin' => $instance['widget']['settings']['plugin'],
+    'field_name' => $field['field_name'],
+    'entity_type' => $instance['entity_type'],
+    'bundle' => $instance['bundle'],
   );
 
   $form[$field['field_name'] . '_settings'] = array(
@@ -172,7 +175,6 @@ function entityreference_modal_widget_add_resources($form, &$form_state) {
   ctools_include('modal');
   ctools_include('plugins');
   ctools_modal_add_js();
-  drupal_add_js(drupal_get_path('module', 'entityreference_modal_widget') . '/entityreference_modal_widget.js');
 
   return $form;
 }
@@ -267,10 +269,16 @@ function entityreference_modal_widget_modal($mode, $settings_selector, $field_na
 function entityreference_modal_widget_ajax() {
   $post = $_POST;
 
-  foreach ($post['entity_ids'] as $entity_id) {
-    $post['default_entity_ids'][] = $entity_id;
+  $entity_type = $post['entity_type'];
+  $bundle = $post['bundle'];
+
+  $instance = field_info_instance($entity_type, $post['element'], $bundle);
+  $plugin_name = $instance['widget']['settings']['plugin'];
+
+  if ($plugin = entityreference_modal_widget_plugin_instance($plugin_name)) {
+    $entity_ids = $plugin->get_entity_ids($post);
   }
-  $entity_ids = array_unique($post['default_entity_ids']);
+
   $rows['#theme'] = 'entityreference_modal_widget_rows';
   $rows['#cardinality'] = $post['cardinality'];
 
@@ -278,7 +286,7 @@ function entityreference_modal_widget_ajax() {
     $rows[$delta] = entityreference_modal_widget_row($delta, $post['element'], $post['target_type'], $post['langcode'], $entity_id, count($entity_ids));
   }
 
-  if (!empty($post['entity_ids'])) {
+  if (!empty($entity_ids)) {
     print render($rows);
   }
 }

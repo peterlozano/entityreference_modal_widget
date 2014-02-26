@@ -24,4 +24,16 @@ abstract class entityreference_modal_widget {
    * @return array
    */
   public function options_form($settings) { return array(); }
+
+
+  /**
+   * Converts the ajax post string into an array of entity_ids.
+   *
+   * @param $post string
+   *  The content of the $_POST received in the ajax request.
+   * @return array
+   *  List of entity_ids as they will be included in the reference field.
+   */
+  public function get_entity_ids($post) { return array(); }
+
 }
