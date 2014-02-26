@@ -23,6 +23,8 @@ class entityreference_modal_widget_view extends entityreference_modal_widget {
 
     $output = $view->preview();
 
+    drupal_add_js(drupal_get_path('module', 'entityreference_modal_widget') . '/plugins/ermw_modal/view.js');
+
     return $output;
   }
 
@@ -64,7 +66,7 @@ class entityreference_modal_widget_view extends entityreference_modal_widget {
 
   public function get_entity_ids($post) {
     $entity_ids = array();
-    foreach ($post_entity_ids as $entity_id) {
+    foreach ($post['entity_ids'] as $entity_id) {
       $entity_ids[] = $entity_id;
     }
     $entity_ids = array_unique($entity_ids);
