@@ -6,4 +6,4 @@ dependencies[] = entityreference
 dependencies[] = ctools
 
 files[] = entityreference_modal_widget.inc
-
+files[] = views/entityreference_modal_widget_handler_field_checkbox.inc

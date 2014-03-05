@@ -33,7 +33,7 @@ class entityreference_modal_widget_view extends entityreference_modal_widget {
 
     // Get a list of all views that contain a "Entityreference View Widget" display.
     $options = array();
-    $displays = views_get_applicable_views('entityreference view display');
+    $displays = $this->applicable_views();
     foreach ($displays as $data) {
       list($view, $display_id) = $data;
       $view_name = !empty($view->human_name) ? $view->human_name : $view->name;
@@ -72,5 +72,26 @@ class entityreference_modal_widget_view extends entityreference_modal_widget {
     $entity_ids = array_unique($entity_ids);
 
     return $entity_ids;
+  }
+
+  /**
+   * Find the views that have a display with entityreference_modal_widget that
+   * could be used as entityreference view input.
+   */
+  private function applicable_views() {
+    $result = array();
+    $views = views_get_all_views();
+    foreach ($views as $view) {
+      foreach (array_keys($view->display) as $id) {
+        $v = $view->clone_view();
+        if ($v->set_display($id) && $v->display_handler->get_option('enabled')) {
+          $view_fields = $v->display_handler->get_option('fields');
+          if (isset($view_fields['entityreference_modal_widget'])) {
+            $result[] = array($v, $id);
+          }
+        }
+      }
+    }
+    return $result;
   }
 }
