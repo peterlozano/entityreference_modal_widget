@@ -79,25 +79,37 @@ function entityreference_modal_widget_field_widget_settings_form($field, $instan
       return $element;
     }
 
-    $element['plugin'] = array(
+    $options = array(
+      1 => 1,
+      2 => 2,
+      3 => 3,
+      4 => 4,
+    );
+    $element['plugin_count'] = array(
       '#type' => 'select',
-      '#title' => t('Plugin'),
-      '#options' => $plugin_options,
-      '#default_value' => isset($settings['plugin']) ? $settings['plugin'] : '',
+      '#title' => t('Number of plugins'),
+      '#description' => t('You need to submit the form to be able to see config for all plugins.'),
+      '#default_value' => $settings['plugin_count'],
+      '#options' => $options,
     );
 
-    // Get the options form for the selected plugin.
-    if (isset($settings['plugin'])
-      && ($plugin = entityreference_modal_widget_plugin_instance($settings['plugin']))) {
-      $element += $plugin->options_form($settings);
+    $element['plugins'] = array(
+      '#tree' => TRUE,
+    );
+    for ($i = 0; $i < $settings['plugin_count']; $i++) {
+      $element['plugins'][$i]['plugin'] = array(
+        '#type' => 'select',
+        '#title' => t('Plugin') . ' ' . $i,
+        '#options' => $plugin_options,
+        '#default_value' => isset($settings['plugins'][$i]['plugin']) ? $settings['plugins'][$i]['plugin'] : '',
+      );
+
+      // Get the options form for the selected plugin.
+      if (isset($settings['plugins'][$i]['plugin'])
+        && ($plugin = entityreference_modal_widget_plugin_instance($settings['plugins'][$i]['plugin']))) {
+        $element['plugins'][$i] += $plugin->options_form($settings['plugins'][$i]);
+      }
     }
-
-    $element['close_modal'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Close modal window after submitting the items'),
-      '#description' => t('If enabled, the modal window will close after you had selected the entities and submitted your selection.'),
-      '#default_value' => isset($settings['close_modal']) ? $settings['close_modal'] : '',
-    );
   }
 
   return $element;
@@ -116,8 +128,10 @@ function entityreference_modal_widget_field_widget_form(&$form, &$form_state, $f
   }
 
   $frontend_id = drupal_html_id($field['field_name']);
-  $settings_selector = 'entityreference-modal-widget-' . $frontend_id . '-settings';
   $form['#after_build'][] = 'entityreference_modal_widget_add_resources';
+
+  $element['#theme'] = 'entityreference_modal_widget_widget';
+  $element['#cardinality'] = $field['cardinality'];
 
   // Generate an array of settings that will be needed later and we pass around
   // in a hidden element.
@@ -129,52 +143,54 @@ function entityreference_modal_widget_field_widget_form(&$form, &$form_state, $f
     'element' => $parents_path,
     'required' => $instance['required'],
     'field_label' => $instance['label'],
-    'close_modal' => $instance['widget']['settings']['close_modal'],
-    'plugin' => $instance['widget']['settings']['plugin'],
+//    'close_modal' => $plugin_settings['close_modal'],
+//    'plugin' => $plugin_settings['plugin'],
     'field_name' => $field['field_name'],
     'entity_type' => $instance['entity_type'],
     'bundle' => $instance['bundle'],
   );
 
-  $element[$field['field_name'] . '_settings'] = array(
+  $element['#settings'] = $settings;
+  $element['settings'] = array(
     '#type' => 'hidden',
     '#default_value' => drupal_json_encode($settings),
     '#weight' => 100,
-    '#attributes' => array(
-      'id' => $settings_selector,
-    ),
     '#name' => $field['field_name'] . '_settings',
   );
 
-  $element['#theme'] = 'entityreference_modal_widget_widget';
-  $element['#cardinality'] = $field['cardinality'];
+  $element['add_buttons'] = array();
+  $element['modal_urls'] = array();
 
-  $add_more_id = "add-more-" . $field['field_name'];
+  foreach ($instance['widget']['settings']['plugins'] as $i => $plugin_settings) {
+    $add_more_id = "add-more-" . $field['field_name'] . '-' . $i;
 
-  // Set the modal URL that this field 'add more' button will use.
-  $element['modal_url_' . $field['field_name']] = array(
-    '#type' => 'hidden',
-    '#value' => url('entityreference_modal_widget/nojs/modal/' . $settings_selector . '/' . $instance['field_name'] . '/' . $instance['entity_type'] . '/' . $instance['bundle']),
-    '#attributes' => array('class' => array($add_more_id . '-url')),
-    '#name' => 'modal_url_' . $field['field_name'],
-  );
+    $plugin = $plugin_settings['plugin'];
 
-  $add_more_text = ($field['cardinality'] == 1) ? 'Add item' : 'Add items';
-  $element['add_more'] = array(
-    '#type' => 'submit',
-    '#value' => $add_more_text,
-    '#attributes' => array(
-      'id' => $add_more_id,
-      'title' => $add_more_text,
-      'class' => array('ctools-use-modal', 'button'),
-    ),
-    '#name' => $field['field_name'] . '_add_more',
-    '#element_validate' => array('entityreference_modal_widget_validate'),
-    '#attached' => array(
-      'css' => array(drupal_get_path('module', 'entityreference_modal_widget') . '/entityreference_modal_widget.css'),
-    ),
-    '#settings' => $settings,
-  );
+    // Set the modal URL that this field 'add more' button will use.
+    $element['modal_urls'][$i] = array(
+      '#type' => 'hidden',
+      '#value' => url('entityreference_modal_widget/nojs/modal/' . $i . '/' . $instance['field_name'] . '/' . $instance['entity_type'] . '/' . $instance['bundle']),
+      '#attributes' => array('class' => array($add_more_id . '-url')),
+      '#name' => 'modal_url_' . $field['field_name'] . $i,
+    );
+
+    $add_more_text = ($field['cardinality'] == 1) ? 'Add item' : 'Add items';
+    $element['add_buttons'][$i] = array(
+      '#type' => 'submit',
+      '#value' => $add_more_text,
+      '#attributes' => array(
+        'id' => $add_more_id,
+        'title' => $add_more_text,
+        'class' => array('ctools-use-modal', 'button'),
+      ),
+      '#name' => $field['field_name'] . '_add_more_' . $i,
+      '#element_validate' => array('entityreference_modal_widget_validate'),
+      '#attached' => array(
+        'css' => array(drupal_get_path('module', 'entityreference_modal_widget') . '/entityreference_modal_widget.css'),
+      ),
+      '#settings' => $settings,
+    );
+  }
 
   foreach ($items as $delta => $item) {
     $element[$delta] = entityreference_modal_widget_row($delta, $parents_path, $field['settings']['target_type'], $langcode, $item['target_id'], count($items));
@@ -238,7 +254,7 @@ function entityreference_modal_widget_validate($element, &$form_state, $form) {
  * hidden elements with information that must be received by the ajax
  * callback that will receive this page submit.
  */
-function entityreference_modal_widget_modal_form($form, $form_state, $html, $settings, $post) {
+function entityreference_modal_widget_modal_form($form, $form_state, $plugin_no, $settings, $post) {
   $form = array(
     '#type' => 'container',
     '#attributes' => array(
@@ -248,11 +264,17 @@ function entityreference_modal_widget_modal_form($form, $form_state, $html, $set
 
   $instance = field_info_instance($settings['entity_type'], $settings['field_name'], $settings['bundle']);
 
+  $plugin_settings = $instance['widget']['settings']['plugins'][$plugin_no];
+
   // Get a instance of the selected plugin.
-  $plugin = entityreference_modal_widget_plugin_instance($instance['widget']['settings']['plugin']);
+  $plugin = entityreference_modal_widget_plugin_instance($plugin_settings['plugin']);
 
   // Call the render method, pass the settings.
-  $form['plugin_elements'] = $plugin->modal_elements($instance['widget']['settings']);
+  $form['plugin_elements'] = $plugin->modal_elements($plugin_settings);
+  $form['plugin_no'] = array(
+    '#type' => 'hidden',
+    '#value' => $plugin_no,
+  );
 
   // We add a hidden element with the list of items that were already in the
   // field. We get that info from the posted values.
@@ -297,14 +319,10 @@ function entityreference_modal_widget_modal_form($form, $form_state, $html, $set
  *
  * @param string $mode
  *   Mode: js or nojs.
- * @param string $name
- *   Machine name of the target view.
- * @param string $display
- *   Display name of the target view.
- * @param string $settings_selector
- *   The dom selector of the settings element.
+ * @param string $plugin_nod
+ *   The plugin no in the field settings.
  */
-function entityreference_modal_widget_modal($mode, $settings_selector, $field_name, $entity_type, $bundle) {
+function entityreference_modal_widget_modal($mode, $plugin_no, $field_name, $entity_type, $bundle) {
   ctools_include('modal');
   ctools_include('ajax');
 
@@ -313,15 +331,10 @@ function entityreference_modal_widget_modal($mode, $settings_selector, $field_na
   // Decode the posted settings.
   $settings = drupal_json_decode($post[$field_name . '_settings']);
 
-  $output = '';
+  // Generate the form, we pass the plugin html to be included.
+  $form = drupal_get_form('entityreference_modal_widget_modal_form', $plugin_no, $settings, $post);
 
-  $plugin_name = $settings['plugin'];
-  if (!empty($plugin_name)) {
-    // Generate the form, we pass the plugin html to be included.
-    $form = drupal_get_form('entityreference_modal_widget_modal_form', $html, $settings, $post);
-
-    $output = drupal_render($form);
-  }
+  $output = drupal_render($form);
 
   return ctools_modal_render(t('Select entities'), $output);
 }
@@ -352,8 +365,11 @@ function entityreference_modal_widget_ajax() {
     }
   }
 
+  $plugin_no = $post['plugin_no'];
+  $instance = field_info_instance($post['entity_type'], $post['field_name'], $post['bundle']);
+  $plugin_name = $instance['widget']['settings']['plugins'][$plugin_no]['plugin'];
+
   // Get the list of new ids, this is plugin dependent.
-  $plugin_name = $post['plugin'];
   if ($plugin = entityreference_modal_widget_plugin_instance($plugin_name)) {
     // Ask the plugin to interpret the posted values and generate a list of entity_ids.
     $entity_ids = $plugin->get_entity_ids($post);
@@ -473,9 +489,10 @@ function entityreference_modal_widget_weights($max_delta) {
  */
 function theme_entityreference_modal_widget_widget($variables) {
   $widget = $variables['widget'];
-  $table_id = $widget['add_more']['#settings']['table_id'];
-  $order_class = drupal_html_class($widget['add_more']['#settings']['element'] . '-delta-order');
-  $required = !empty($widget['add_more']['#settings']['required']) ? theme('form_required_marker', $variables) : '';
+  dpm($widget);
+  $table_id = $widget['#settings']['table_id'];
+  $order_class = drupal_html_class($widget['#settings']['element'] . '-delta-order');
+  $required = !empty($widget['#settings']['required']) ? theme('form_required_marker', $variables) : '';
 
   $header = array(
     array(
@@ -492,18 +509,16 @@ function theme_entityreference_modal_widget_widget($variables) {
   }
   $rows = array();
 
-  $field_name = $widget['#field_name'];
-
   $items = array();
   foreach (element_children($widget) as $key) {
     switch ((string)$key) {
-      case 'add_more':
-        $add_more_button = &$widget[$key];
+      case 'add_buttons':
+        $add_buttons = &$widget[$key];
         break;
-      case 'modal_url_' . $field_name:
-        $modal_url_hidden = &$widget[$key];
+      case 'modal_urls':
+        $modal_urls = &$widget[$key];
         break;
-      case $field_name . '_settings':
+      case 'settings':
         $settings_hidden = &$widget[$key];
         break;
       default:
@@ -550,8 +565,12 @@ function theme_entityreference_modal_widget_widget($variables) {
     ),
   ));
   $output .= $widget['#description'] ? '<div class="description">' . $widget['#description'] . '</div>' : '';
-  $output .= '<div class="clearfix">' . render($add_more_button) . '</div>';
-  $output .= '<div class="clearfix">' . render($modal_url_hidden) . '</div>';
+  foreach (element_children($add_buttons) as $key) {
+    $output .= '<div class="clearfix">' . render($add_buttons[$key]) . '</div>';
+  }
+  foreach (element_children($modal_urls) as $key) {
+    $output .= '<div class="clearfix">' . render($modal_urls[$key]) . '</div>';
+  }
   $output .= '<div class="clearfix">' . render($settings_hidden) . '</div>';
   $output .= '</div>';
 
