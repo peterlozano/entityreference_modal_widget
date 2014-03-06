@@ -85,28 +85,51 @@ function entityreference_modal_widget_field_widget_settings_form($field, $instan
       3 => 3,
       4 => 4,
     );
+    $plugin_count = isset($_POST['instance']['widget']['settings']['plugin_count']) ?
+      $_POST['instance']['widget']['settings']['plugin_count'] : $settings['plugin_count'];
     $element['plugin_count'] = array(
       '#type' => 'select',
       '#title' => t('Number of plugins'),
       '#description' => t('You need to submit the form to be able to see config for all plugins.'),
-      '#default_value' => $settings['plugin_count'],
+      '#default_value' => $plugin_count,
       '#options' => $options,
+      '#ajax' => array(
+        'callback' => 'entityreference_modal_widget_plugins_ajax_callback',
+        'wrapper' => 'plugins-div',
+        'method' => 'replace',
+        'effect' => 'fade',
+      ),
     );
 
     $element['plugins'] = array(
       '#tree' => TRUE,
+      '#prefix' => '<div id="plugins-div">',
+      '#suffix' => '</div>',
     );
-    for ($i = 0; $i < $settings['plugin_count']; $i++) {
+//    $plugin_count = !empty($form_state['values']['plugin_count']) ? $form_state['values']['plugin_count'] : $settings['plugin_count'];
+    for ($i = 0; $i < $plugin_count; $i++) {
+      $element['plugins'][$i] = array(
+        '#prefix' => '<div id="plugin-' . $i . '-div">',
+        '#suffix' => '</div>',
+      );
       $element['plugins'][$i]['plugin'] = array(
         '#type' => 'select',
         '#title' => t('Plugin') . ' ' . $i,
         '#options' => $plugin_options,
         '#default_value' => isset($settings['plugins'][$i]['plugin']) ? $settings['plugins'][$i]['plugin'] : '',
+        '#ajax' => array(
+          'callback' => 'entityreference_modal_widget_plugin_settings_ajax_callback',
+          'wrapper' => 'plugin-' . $i . '-div',
+          'method' => 'replace',
+          'effect' => 'fade',
+        ),
+        '#plugin_no' => $i,
       );
 
       // Get the options form for the selected plugin.
-      if (isset($settings['plugins'][$i]['plugin'])
-        && ($plugin = entityreference_modal_widget_plugin_instance($settings['plugins'][$i]['plugin']))) {
+      $plugin = isset($_POST['instance']['widget']['settings']['plugins'][$i]['plugin']) ?
+        $_POST['instance']['widget']['settings']['plugins'][$i]['plugin'] : $settings['plugins'][$i]['plugin'];
+      if ($plugin && ($plugin = entityreference_modal_widget_plugin_instance($plugin))) {
         $element['plugins'][$i] += $plugin->options_form($settings['plugins'][$i]);
       }
     }
@@ -114,6 +137,22 @@ function entityreference_modal_widget_field_widget_settings_form($field, $instan
 
   return $element;
 }
+
+/**
+ * Ajax callback to replace the plugin list depending on the number of plugins.
+ */
+function entityreference_modal_widget_plugins_ajax_callback($form, $form_state) {
+  return $form['instance']['widget']['settings']['plugins'];
+}
+
+/**
+ * Ajax callback to replace the plugin settings elements.
+ */
+function entityreference_modal_widget_plugin_settings_ajax_callback($form, $form_state) {
+  $plugin_no = $form_state['triggering_element']['#plugin_no'];
+  return $form['instance']['widget']['settings']['plugins'][$plugin_no];
+}
+
 
 /**
  * Implements hook_field_widget_form().
@@ -501,7 +540,6 @@ function entityreference_modal_widget_weights($max_delta) {
  */
 function theme_entityreference_modal_widget_widget($variables) {
   $widget = $variables['widget'];
-  dpm($widget);
   $table_id = $widget['#settings']['table_id'];
   $order_class = drupal_html_class($widget['#settings']['element'] . '-delta-order');
   $required = !empty($widget['#settings']['required']) ? theme('form_required_marker', $variables) : '';
