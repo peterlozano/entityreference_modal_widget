@@ -64,6 +64,7 @@ function entityreference_modal_widget_field_widget_settings_form($field, $instan
   $settings = $widget['settings'];
 
   if ($widget['type'] == 'entityreference_modal_widget') {
+    // Generate a list of available plugins.
     ctools_include('plugins');
     $plugins = ctools_get_plugins('entityreference_modal_widget', 'ermw_modal');
     $plugin_options = array();
@@ -106,12 +107,6 @@ function entityreference_modal_widget_field_widget_settings_form($field, $instan
  * Implements hook_field_widget_form().
  */
 function entityreference_modal_widget_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
-  ctools_include('ajax');
-  ctools_include('modal');
-  ctools_include('plugins');
-  $element['#theme'] = 'entityreference_modal_widget_widget';
-  $element['#cardinality'] = $field['cardinality'];
-
   // Build the path of the element.
   $parents_path = $field['field_name'];
   if (!empty($form['#parents'])) {
@@ -124,6 +119,8 @@ function entityreference_modal_widget_field_widget_form(&$form, &$form_state, $f
   $settings_selector = 'entityreference-modal-widget-' . $frontend_id . '-settings';
   $form['#after_build'][] = 'entityreference_modal_widget_add_resources';
 
+  // Generate an array of settings that will be needed later and we pass around
+  // in a hidden element.
   $settings = array(
     'langcode' => $langcode,
     'table_id' => $frontend_id . '-values',
@@ -139,21 +136,40 @@ function entityreference_modal_widget_field_widget_form(&$form, &$form_state, $f
     'bundle' => $instance['bundle'],
   );
 
-  $form[$field['field_name'] . '_settings'] = array(
+  $element[$field['field_name'] . '_settings'] = array(
     '#type' => 'hidden',
     '#default_value' => drupal_json_encode($settings),
     '#weight' => 100,
     '#attributes' => array(
       'id' => $settings_selector,
     ),
+    '#name' => $field['field_name'] . '_settings',
+  );
+
+  $element['#theme'] = 'entityreference_modal_widget_widget';
+  $element['#cardinality'] = $field['cardinality'];
+
+  $add_more_id = "add-more-" . $field['field_name'];
+
+  // Set the modal URL that this field 'add more' button will use.
+  $element['modal_url_' . $field['field_name']] = array(
+    '#type' => 'hidden',
+    '#value' => url('entityreference_modal_widget/nojs/modal/' . $settings_selector . '/' . $instance['field_name'] . '/' . $instance['entity_type'] . '/' . $instance['bundle']),
+    '#attributes' => array('class' => array($add_more_id . '-url')),
+    '#name' => 'modal_url_' . $field['field_name'],
   );
 
   $add_more_text = ($field['cardinality'] == 1) ? 'Add item' : 'Add items';
-
   $element['add_more'] = array(
-    '#markup' => ctools_modal_text_button(t($add_more_text), 'entityreference_modal_widget/nojs/modal/' . $settings_selector . '/' . $instance['field_name'] . '/' . $instance['entity_type'] . '/' . $instance['bundle'], '', 'button field-add-more-submit ervw-add-items'),
+    '#type' => 'submit',
+    '#value' => $add_more_text,
+    '#attributes' => array(
+      'id' => $add_more_id,
+      'title' => $add_more_text,
+      'class' => array('ctools-use-modal', 'button'),
+    ),
+    '#name' => $field['field_name'] . '_add_more',
     '#element_validate' => array('entityreference_modal_widget_validate'),
-    '#name' => $field['field_name'],
     '#attached' => array(
       'css' => array(drupal_get_path('module', 'entityreference_modal_widget') . '/entityreference_modal_widget.css'),
     ),
@@ -175,6 +191,8 @@ function entityreference_modal_widget_add_resources($form, &$form_state) {
   ctools_include('modal');
   ctools_include('plugins');
   ctools_modal_add_js();
+
+  drupal_add_js(drupal_get_path('module', 'entityreference_modal_widget') . '/entityreference_modal_widget.js');
 
   return $form;
 }
@@ -211,6 +229,81 @@ function entityreference_modal_widget_validate($element, &$form_state, $form) {
 }
 
 /**
+ * Form that goes into the modal dialog.
+ *
+ * We call the render() method of the plugin to generate html content
+ * that will be inserted into the form.
+ *
+ * We include standard visible for element but we also include several
+ * hidden elements with information that must be received by the ajax
+ * callback that will receive this page submit.
+ */
+function entityreference_modal_widget_modal_form($form, $form_state, $html, $settings, $post) {
+  $form = array(
+    '#type' => 'container',
+    '#attributes' => array(
+      'id' => 'entityreference-modal-widget-modal-submit',
+    )
+  );
+
+  // Include the plugin generated html in the form.
+  $form['html'] = array(
+    '#type' => 'markup',
+    '#markup' => $html,
+    '#weight' => -10,
+  );
+
+  // We add a hidden element with the list of items that were already in the
+  // field. We get that info from the posted values.
+  $field_name = $settings['field_name'];
+  if (isset($post[$field_name]['und'])) {
+    $form['erwm_items'] = array(
+      '#type' => 'hidden',
+      '#value' => drupal_json_encode($post[$field_name]['und']),
+    );
+  }
+
+  // We store settings in the form.
+  foreach ($settings as $key => $value) {
+    $form[$key] = array(
+      '#type' => 'hidden',
+      '#value' => $settings[$key],
+    );
+  }
+
+  // Element that allows to chose the position of the added items.
+  $options = array(
+    'bottom' => 'Add to the bottom',
+    'top' => 'Add to the top',
+  );
+  $form['optposition'] = array(
+    '#type' => 'select',
+    '#options' => $options,
+    '#weight' => 10,
+    '#name' => array('entityreference_modal_widget_options'),
+  );
+
+  // Set the url where the submit button will call via ajax.
+  $form['modal_url'] = array(
+    '#type' => 'hidden',
+    '#value' => url('entityreference_modal_widget/ajax'),
+    '#attributes' => array('class' => array('button-add-url')),
+  );
+
+  $form['button_add'] = array(
+    '#type' => 'button',
+    '#value' => t('Submit'),
+    '#attributes' => array(
+      'class' => array('button', 'ctools-use-modal'),
+      'id' => 'button-add',
+    ),
+    '#weight' => 20,
+  );
+
+  return $form;
+}
+
+/**
  * Callback for ctools modal window.
  *
  * @param string $mode
@@ -226,9 +319,14 @@ function entityreference_modal_widget_modal($mode, $settings_selector, $field_na
   ctools_include('modal');
   ctools_include('ajax');
 
-  $instance = field_info_instance($entity_type, $field_name, $bundle);
+  $post = $_POST;
 
-  $plugin_name = $instance['widget']['settings']['plugin'];
+  // Decode the posted settings.
+  $settings = drupal_json_decode($post[$field_name . '_settings']);
+
+  $output = '';
+
+  $plugin_name = $settings['plugin'];
   if (!empty($plugin_name)) {
     // Get a instance of the selected plugin.
     $plugin = entityreference_modal_widget_plugin_instance($plugin_name);
@@ -236,59 +334,95 @@ function entityreference_modal_widget_modal($mode, $settings_selector, $field_na
     // Call the render method, pass the settings.
     $html = $plugin->render($instance['widget']['settings']);
 
-    $submit = array(
-      '#type' => 'container',
-      '#attributes' => array(
-        'id' => 'entityreference-modal-widget-modal-submit',
-      ),
-      'button_add' => array(
-        '#type' => 'button',
-        '#value' => t('Submit'),
-        '#attributes' => array(
-          'class' => array('button'),
-        ),
-      ),
-      'settings_selector' => array(
-        '#type' => 'hidden',
-        '#value' => $settings_selector,
-        '#attributes' => array(
-          'id' => 'entityreference-modal-widget-settings-selector',
-        ),
-      ),
-    );
+    // Generate the form, we pass the plugin html to be included.
+    $form = drupal_get_form('entityreference_modal_widget_modal_form', $html, $settings, $post);
 
-    $html .= drupal_render($submit);
+    $output = drupal_render($form);
   }
 
-  return ctools_modal_render(t('Select entities'), $html);
+  return ctools_modal_render(t('Select entities'), $output);
 }
 
 /**
  * Ajax callback to transform selected entity IDs into table rows.
+ *
+ * We don't return html here anymore. We generate a list of ajax commands
+ * that will replace the content of the entity reference field and also
+ * perform other alterations to the node form.
  */
 function entityreference_modal_widget_ajax() {
+  ctools_include('ajax');
+  ctools_include('modal');
+
   $post = $_POST;
 
-  $entity_type = $post['entity_type'];
-  $bundle = $post['bundle'];
+  $item_count = 0;
 
-  $instance = field_info_instance($entity_type, $post['field_name'], $bundle);
-  $plugin_name = $instance['widget']['settings']['plugin'];
+  // Generate rows for items that already existed in the field.
+  $old_rows = array();
+  $existing_items = drupal_json_decode($post['erwm_items']);
+  if (is_array($existing_items)) {
+    foreach ($existing_items as $item) {
+      $entity_id = $item['target_id'];
+      $old_rows[] = entityreference_modal_widget_row($item_count, $post['element'], $post['target_type'], $post['langcode'], $entity_id, count($existing_items));
+      $item_count++;
+    }
+  }
 
+  // Get the list of new ids, this is plugin dependent.
+  $plugin_name = $post['plugin'];
   if ($plugin = entityreference_modal_widget_plugin_instance($plugin_name)) {
+    // Ask the plugin to interpret the posted values and generate a list of entity_ids.
     $entity_ids = $plugin->get_entity_ids($post);
   }
 
+  // Generate rows for the items that were added in the modal.
+  $new_rows = array();
+  $max = count($existing_items) + count($entity_ids);
+  foreach ($entity_ids as $entity_id) {
+    $new_rows[] = entityreference_modal_widget_row($item_count, $post['element'], $post['target_type'], $post['langcode'], $entity_id, $max);
+    $item_count++;
+  }
+
+  // Merge the two lists depending on the option to prepend or append.
+  switch ((string)$post['entityreference_modal_widget_options']) {
+    case 'top':
+      $rows = array_merge($new_rows, $old_rows);
+      break;
+    default:
+      // By default new items go to the bottom of the list.
+      $rows = array_merge($old_rows, $new_rows);
+  }
+
+  // Add required info to properly theme the rows element.
   $rows['#theme'] = 'entityreference_modal_widget_rows';
   $rows['#cardinality'] = $post['cardinality'];
 
-  foreach ($entity_ids as $delta => $entity_id) {
-    $rows[$delta] = entityreference_modal_widget_row($delta, $post['element'], $post['target_type'], $post['langcode'], $entity_id, count($entity_ids));
+  $commands = array();
+  if (!empty($entity_ids)) {
+    // Render the rows html, we are going to insert this into the table later.
+    $html_replace = render($rows);
+
+    $table_id = drupal_html_id($post['field_name']) . '-values';
+    $selector = '#' . $table_id . ' tbody';
+
+    // Command to insert generated rows html into the table.
+    // We don't use ajax_command_html because a bug inserts a div in some cases
+    // that breaks the table. See: https://drupal.org/node/736066
+    $commands[] = ajax_command_invoke($selector, 'html', array($html_replace));
   }
 
-  if (!empty($entity_ids)) {
-    print render($rows);
-  }
+  // Invoke the js to rebuild the draggable table.
+  // This is a custom ajax command. See: entityreference_modal_widget.js
+  $commands[] = array(
+    'command' => 'ermw_redrag',
+    'table_id' => $table_id,
+  );
+
+  // Add a command to close the modal dialog.
+  $commands[] = ctools_modal_command_dismiss();
+
+  print ajax_render($commands);
 }
 
 /**
@@ -378,17 +512,28 @@ function theme_entityreference_modal_widget_widget($variables) {
   }
   $rows = array();
 
-  // Sort items according to '_weight' (needed when the form comes back after
-  // preview or failed validation)
+  $field_name = $widget['#field_name'];
+
   $items = array();
   foreach (element_children($widget) as $key) {
-    if ($key === 'add_more') {
-      $add_more_button = &$widget[$key];
-    }
-    else {
-      $items[] = &$widget[$key];
+    switch ((string)$key) {
+      case 'add_more':
+        $add_more_button = &$widget[$key];
+        break;
+      case 'modal_url_' . $field_name:
+        $modal_url_hidden = &$widget[$key];
+        break;
+      case $field_name . '_settings':
+        $settings_hidden = &$widget[$key];
+        break;
+      default:
+        if (is_numeric($key)) {
+          $items[] = &$widget[$key];
+        }
     }
   }
+  // Sort items according to '_weight' (needed when the form comes back after
+  // preview or failed validation)
   usort($items, '_field_sort_items_value_helper');
 
   // Add the items as table rows.
@@ -425,7 +570,9 @@ function theme_entityreference_modal_widget_widget($variables) {
     ),
   ));
   $output .= $widget['#description'] ? '<div class="description">' . $widget['#description'] . '</div>' : '';
-  $output .= '<div class="clearfix">' . drupal_render($add_more_button) . '</div>';
+  $output .= '<div class="clearfix">' . render($add_more_button) . '</div>';
+  $output .= '<div class="clearfix">' . render($modal_url_hidden) . '</div>';
+  $output .= '<div class="clearfix">' . render($settings_hidden) . '</div>';
   $output .= '</div>';
 
   if ($widget['#cardinality'] !== '1') {

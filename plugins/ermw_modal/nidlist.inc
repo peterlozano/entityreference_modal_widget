@@ -17,16 +17,14 @@ class entityreference_modal_widget_nidlist extends entityreference_modal_widget 
       '#type' => 'textarea',
       '#title' => t('Nid list'),
       '#description' => t('Write a list of nids, one in each line.'),
-      '#attached' => array(
-        'js' => array(drupal_get_path('module', 'entityreference_modal_widget') . '/plugins/ermw_modal/nidlist.js'),
-      )
+      '#name' => 'nid_textarea',
     );
 
     return drupal_render($element);
   }
 
   public function get_entity_ids($post) {
-    $entity_ids = explode("\n", $post['textarea']);
+    $entity_ids = explode("\n", $post['nid_textarea']);
 
     return $entity_ids;
   }
