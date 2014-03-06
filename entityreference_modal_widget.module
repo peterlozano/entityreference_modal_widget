@@ -423,6 +423,10 @@ function entityreference_modal_widget_ajax() {
     'table_id' => $table_id,
   );
 
+  if (method_exists($plugin, 'closed_commands')) {
+    $commands = array_merge($commands, $plugin->closed_commands($post));
+  }
+
   // Add a command to close the modal dialog.
   $commands[] = ctools_modal_command_dismiss();
 

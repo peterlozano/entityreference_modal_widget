@@ -37,5 +37,22 @@ class entityreference_modal_widget_nidlist extends entityreference_modal_widget 
   public function add_items_text() {
     return t('Add items using a textarea');
   }
+
+  /**
+   * Returns extra ajax commands to be executed.
+   *
+   * See entityreference_modal_widget.js for an example on how to
+   * create custom commands.
+   *
+   * @param $post
+   * @return array
+   */
+  public function closed_commands($post) {
+    $commands = array();
+
+    $commands[] = ajax_command_alert(t('Nids added'));
+
+    return $commands;
+  }
 }
 
