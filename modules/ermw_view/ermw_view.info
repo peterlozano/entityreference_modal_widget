@@ -1,0 +1,8 @@
+name = ERMW View Plugin
+description = Module to allow to use views in modal dialog to select ER nodes.
+package = Entity Reference Modal Widget
+core = 7.x
+
+dependencies[] = entityreference_modal_widget
+
+files[] = views/ermw_view_handler_field_checkbox.inc

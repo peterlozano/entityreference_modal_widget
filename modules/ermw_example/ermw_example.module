@@ -1,0 +1,19 @@
+<?php
+
+/**
+ * @file
+ * Main module code.
+ */
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function ermw_example_ctools_plugin_directory($owner, $plugin_type) {
+  switch ($plugin_type) {
+    case 'ermw_modal':
+      return "plugins/ermw_modal";
+  }
+
+  return NULL;
+}
+

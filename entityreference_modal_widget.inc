@@ -13,6 +13,7 @@ abstract class entityreference_modal_widget {
    * Renders the content of the modal dialog.
    *
    * @param $settings
+   * @returns string
    */
   public function render($settings) { }
 

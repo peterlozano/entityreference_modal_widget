@@ -23,7 +23,7 @@ class entityreference_modal_widget_view extends entityreference_modal_widget {
 
     $output = $view->preview();
 
-    drupal_add_js(drupal_get_path('module', 'entityreference_modal_widget') . '/plugins/ermw_modal/view.js');
+    drupal_add_js(drupal_get_path('module', 'ermw_view') . '/plugins/ermw_modal/view.js');
 
     return $output;
   }
@@ -86,7 +86,7 @@ class entityreference_modal_widget_view extends entityreference_modal_widget {
         $v = $view->clone_view();
         if ($v->set_display($id) && $v->display_handler->get_option('enabled')) {
           $view_fields = $v->display_handler->get_option('fields');
-          if (isset($view_fields['entityreference_modal_widget'])) {
+          if (isset($view_fields['ermw_view_checkbox'])) {
             $result[] = array($v, $id);
           }
         }

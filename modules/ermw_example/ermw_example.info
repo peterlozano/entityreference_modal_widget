@@ -1,0 +1,6 @@
+name = ERMW Example
+description = Example plugin module for Entityreference Modal Widget.
+package = Entity Reference Modal Widget
+core = 7.x
+
+dependencies[] = entityreference_modal_widget

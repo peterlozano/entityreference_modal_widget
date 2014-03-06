@@ -324,6 +324,8 @@ function entityreference_modal_widget_modal($mode, $settings_selector, $field_na
   // Decode the posted settings.
   $settings = drupal_json_decode($post[$field_name . '_settings']);
 
+  $instance = field_info_instance($settings['entity_type'], $field_name, $settings['bundle']);
+
   $output = '';
 
   $plugin_name = $settings['plugin'];
@@ -614,55 +616,6 @@ function entityreference_modal_widget_ctools_plugin_type() {
   );
 
   return $return;
-}
-
-/**
- * Implements hook_ctools_plugin_directory().
- */
-function entityreference_modal_widget_ctools_plugin_directory($owner, $plugin_type) {
-  switch ($plugin_type) {
-    case 'ermw_modal':
-      return "plugins/ermw_modal";
-  }
-
-  return NULL;
-}
-
-/**
- * Implements hook_views_data_alter().
- */
-function entityreference_modal_widget_views_data_alter(&$data) {
-  $tables = array();
-
-  // build entity tables
-  $entity_info = entity_get_info();
-  foreach ($entity_info as $info) {
-    if (isset($info['base table'])) {
-      $tables[$info['base table']] = $info['entity keys']['id'];
-    }
-  }
-
-  // build search_api index tables
-  if (module_exists('search_api_views')) {
-    foreach (search_api_index_load_multiple(FALSE) as $index) {
-      $tables['search_api_index_' . $index->machine_name] = 'search_api_id';
-    }
-  }
-
-  foreach ($tables as $table => $entity_id_key) {
-    if (isset($data[$table]['table'])) {
-      $data[$table]['entityreference_modal_widget'] = array(
-        'title' => $data[$table]['table']['group'],
-        'group' => t('Entity Reference View Widget Checkbox'),
-        'help' => t('Provide a checkbox to select the row for an entity reference.'),
-        'real field' => $entity_id_key,
-        'field' => array(
-          'handler' => 'entityreference_modal_widget_handler_field_checkbox',
-          'click sortable' => FALSE,
-        ),
-      );
-    }
-  }
 }
 
 /**
