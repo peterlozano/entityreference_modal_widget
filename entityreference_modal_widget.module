@@ -164,8 +164,6 @@ function entityreference_modal_widget_field_widget_form(&$form, &$form_state, $f
   foreach ($instance['widget']['settings']['plugins'] as $i => $plugin_settings) {
     $add_more_id = "add-more-" . $field['field_name'] . '-' . $i;
 
-    $plugin = $plugin_settings['plugin'];
-
     // Set the modal URL that this field 'add more' button will use.
     $element['modal_urls'][$i] = array(
       '#type' => 'hidden',
@@ -174,7 +172,17 @@ function entityreference_modal_widget_field_widget_form(&$form, &$form_state, $f
       '#name' => 'modal_url_' . $field['field_name'] . $i,
     );
 
-    $add_more_text = ($field['cardinality'] == 1) ? 'Add item' : 'Add items';
+    $plugin_settings = $instance['widget']['settings']['plugins'][$i];
+
+    // Get a instance of the selected plugin.
+    $plugin = entityreference_modal_widget_plugin_instance($plugin_settings['plugin']);
+
+    $add_more_text = ($field['cardinality'] == 1) ? t('Add item') : t('Add items');
+
+    if (method_exists($plugin, 'add_items_text')) {
+      $add_more_text = $plugin->add_items_text();
+    }
+
     $element['add_buttons'][$i] = array(
       '#type' => 'submit',
       '#value' => $add_more_text,

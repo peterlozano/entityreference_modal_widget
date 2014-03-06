@@ -28,5 +28,14 @@ class entityreference_modal_widget_nidlist extends entityreference_modal_widget 
 
     return $entity_ids;
   }
+
+  /**
+   * Returns the text used in the add more items.
+   *
+   * This is optional. By default 'Add items' is used.
+   */
+  public function add_items_text() {
+    return t('Add items using a textarea');
+  }
 }
 
