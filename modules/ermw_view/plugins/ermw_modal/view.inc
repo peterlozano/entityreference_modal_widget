@@ -15,17 +15,41 @@ $plugin = array(
 );
 
 class entityreference_modal_widget_view extends entityreference_modal_widget {
-  public function render($settings) {
+  public function modal_elements($settings) {
+    // Get the view name
     $target_view = explode('|', $settings['view']);
     $view = views_get_view($target_view[0]);
     $view->set_display($target_view[1]);
     $view->display_handler->set_option('use_ajax', TRUE);
 
+    // Generate the html for the view.
     $output = $view->preview();
 
-    drupal_add_js(drupal_get_path('module', 'ermw_view') . '/plugins/ermw_modal/view.js');
+    $elements = array();
+    $elements['view'] = array(
+      '#type' => 'markup',
+      '#markup' => $output,
+      '#attached' => array(
+        'js' => array(
+          drupal_get_path('module', 'ermw_view') . '/plugins/ermw_modal/view.js',
+        ),
+      )
+    );
 
-    return $output;
+    // Element that allows to chose the position of the added items.
+    // See method merge_rows() for how this is handled.
+    $options = array(
+      'bottom' => 'Add to the bottom',
+      'top' => 'Add to the top',
+    );
+    $elements['optposition'] = array(
+      '#type' => 'select',
+      '#options' => $options,
+      '#weight' => 10,
+      '#name' => array('entityreference_modal_widget_options'),
+    );
+
+    return $elements;
   }
 
   public function options_form($settings) {
@@ -93,5 +117,32 @@ class entityreference_modal_widget_view extends entityreference_modal_widget {
       }
     }
     return $result;
+  }
+
+  /**
+   * This function merges the existing rows with the new selected ones.
+   *
+   * If this method doesn't exist the default method is used.
+   *
+   * By default, new selected nodes are appended.
+   *
+   * @param $old_rows
+   * @param $new_rows
+   * @param $post
+   *  The $_POST content received from the modal dialog form.
+   * @return array
+   */
+  public function merge_rows($old_rows, $new_rows, $post) {
+    // Merge the two lists depending on the option to prepend or append.
+    switch ((string)$post['entityreference_modal_widget_options']) {
+      case 'top':
+        $rows = array_merge($new_rows, $old_rows);
+        break;
+      default:
+        // By default new items go to the bottom of the list.
+        $rows = array_merge($old_rows, $new_rows);
+    }
+
+    return $rows;
   }
 }

@@ -246,12 +246,13 @@ function entityreference_modal_widget_modal_form($form, $form_state, $html, $set
     )
   );
 
-  // Include the plugin generated html in the form.
-  $form['html'] = array(
-    '#type' => 'markup',
-    '#markup' => $html,
-    '#weight' => -10,
-  );
+  $instance = field_info_instance($settings['entity_type'], $settings['field_name'], $settings['bundle']);
+
+  // Get a instance of the selected plugin.
+  $plugin = entityreference_modal_widget_plugin_instance($instance['widget']['settings']['plugin']);
+
+  // Call the render method, pass the settings.
+  $form['plugin_elements'] = $plugin->modal_elements($instance['widget']['settings']);
 
   // We add a hidden element with the list of items that were already in the
   // field. We get that info from the posted values.
@@ -270,18 +271,6 @@ function entityreference_modal_widget_modal_form($form, $form_state, $html, $set
       '#value' => $settings[$key],
     );
   }
-
-  // Element that allows to chose the position of the added items.
-  $options = array(
-    'bottom' => 'Add to the bottom',
-    'top' => 'Add to the top',
-  );
-  $form['optposition'] = array(
-    '#type' => 'select',
-    '#options' => $options,
-    '#weight' => 10,
-    '#name' => array('entityreference_modal_widget_options'),
-  );
 
   // Set the url where the submit button will call via ajax.
   $form['modal_url'] = array(
@@ -324,18 +313,10 @@ function entityreference_modal_widget_modal($mode, $settings_selector, $field_na
   // Decode the posted settings.
   $settings = drupal_json_decode($post[$field_name . '_settings']);
 
-  $instance = field_info_instance($settings['entity_type'], $field_name, $settings['bundle']);
-
   $output = '';
 
   $plugin_name = $settings['plugin'];
   if (!empty($plugin_name)) {
-    // Get a instance of the selected plugin.
-    $plugin = entityreference_modal_widget_plugin_instance($plugin_name);
-
-    // Call the render method, pass the settings.
-    $html = $plugin->render($instance['widget']['settings']);
-
     // Generate the form, we pass the plugin html to be included.
     $form = drupal_get_form('entityreference_modal_widget_modal_form', $html, $settings, $post);
 
@@ -386,14 +367,11 @@ function entityreference_modal_widget_ajax() {
     $item_count++;
   }
 
-  // Merge the two lists depending on the option to prepend or append.
-  switch ((string)$post['entityreference_modal_widget_options']) {
-    case 'top':
-      $rows = array_merge($new_rows, $old_rows);
-      break;
-    default:
-      // By default new items go to the bottom of the list.
-      $rows = array_merge($old_rows, $new_rows);
+  if (method_exists($plugin, 'merge_rows')) {
+    $rows = $plugin->merge_rows($old_rows, $new_rows, $post);
+  }
+  else {
+    $rows = array_merge($old_rows, $new_rows);
   }
 
   // Add required info to properly theme the rows element.

@@ -12,7 +12,7 @@ $plugin = array(
 );
 
 class entityreference_modal_widget_nidlist extends entityreference_modal_widget {
-  public function render($settings) {
+  public function modal_elements($settings) {
     $element = array(
       '#type' => 'textarea',
       '#title' => t('Nid list'),
@@ -20,7 +20,7 @@ class entityreference_modal_widget_nidlist extends entityreference_modal_widget 
       '#name' => 'nid_textarea',
     );
 
-    return drupal_render($element);
+    return $element;
   }
 
   public function get_entity_ids($post) {
